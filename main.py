@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, jsonify
 import alpaca_trade_api as tradeapi
 import os
 from dotenv import load_dotenv
@@ -15,6 +15,11 @@ BASE_URL = "https://paper-api.alpaca.markets"
 # Inizializza Alpaca API
 api = tradeapi.REST(ALPACA_API_KEY, ALPACA_SECRET_KEY, BASE_URL, api_version="v2")
 
+# Liste simboli
+only_long_symbols = ["NDQM", "QQQ", "VOO", "AAPL", "WWRL", "ISP", "VDE", "NVDA"]
+only_short_symbols = ["VWCE"]
+both_directions = ["NDX", "NAS1OO", "SPY", "XLE", "UVXY", "CEMB", "ITA", "CSSPX", "ENI", "TSLA"]
+
 @app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.json
@@ -25,6 +30,14 @@ def webhook():
     symbol = data.get("symbol", "").replace("BINANCE:", "").replace(":", "")  # Es: BINANCE:BTCUSDT → BTCUSDT
     tp = float(data.get("take_profit"))
     sl = float(data.get("stop_loss"))
+
+    # Controlli di simbolo e direzione
+    if symbol in only_long_symbols and action == "short":
+        return jsonify({"error": f"{symbol} è solo LONG"}), 403
+    if symbol in only_short_symbols and action == "long":
+        return jsonify({"error": f"{symbol} è solo SHORT"}), 403
+    if symbol not in (only_long_symbols + only_short_symbols + both_directions):
+        return jsonify({"error": f"{symbol} non è nella lista dei simboli permessi"}), 403
 
     try:
         # Calcolo quantità da tradare (3% del buying power)
@@ -40,18 +53,6 @@ def webhook():
             side = "sell"
         else:
             return f"Azione non riconosciuta: {action}", 400
-
-        # Liste simboli
-        only_long_symbols = ["NDQM", "QQQ", "VOO", "AAPL", "WWRL", "ISP", "VDE", "NVDA"]
-        only_short_symbols = ["VWCE"]
-        both_directions = ["NDX", "NAS1OO", "SPY", "XLE", "UVXY", "CEMB", "ITA", "CSSPX", "ENI", "TSLA"]
-
-        if symbol in only_long_symbols and action == "short":
-            return jsonify({"error": f"{symbol} è solo LONG"}), 403
-        if symbol in only_short_symbols and action == "long":
-            return jsonify({"error": f"{symbol} è solo SHORT"}), 403
-        if symbol not in (only_long_symbols + only_short_symbols + both_directions):
-            return jsonify({"error": f"{symbol} non è nella lista dei simboli permessi"}), 403
 
         # Invia ordine bracket (TP e SL)
         api.submit_order(
