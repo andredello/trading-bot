@@ -1,0 +1,59 @@
+from flask import Flask, request
+import alpaca_trade_api as tradeapi
+import os
+from dotenv import load_dotenv
+
+load_dotenv()  # Carica variabili da .env
+
+app = Flask(__name__)
+
+# Chiavi API da variabili d'ambiente
+ALPACA_API_KEY = os.getenv("ALPACA_API_KEY")
+ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY")
+BASE_URL = "https://paper-api.alpaca.markets"
+
+# Inizializza Alpaca API
+api = tradeapi.REST(ALPACA_API_KEY, ALPACA_SECRET_KEY, BASE_URL, api_version="v2")
+
+@app.route("/webhook", methods=["POST"])
+def webhook():
+    data = request.json
+    if not data:
+        return "Nessun dato ricevuto", 400
+
+    action = data.get("action")
+    symbol = data.get("symbol", "").replace("BINANCE:", "").replace(":", "")  # Es: BINANCE:BTCUSDT → BTCUSDT
+    tp = float(data.get("take_profit"))
+    sl = float(data.get("stop_loss"))
+
+    try:
+        # Calcolo quantità da tradare (3% del buying power)
+        account = api.get_account()
+        buying_power = float(account.buying_power)
+        amount_to_trade = buying_power * 0.03
+        market_price = float(api.get_latest_trade(symbol).price)
+        qty = round(amount_to_trade / market_price, 4)
+
+        if action == "long":
+            side = "buy"
+        elif action == "short":
+            side = "sell"
+        else:
+            return f"Azione non riconosciuta: {action}", 400
+
+        # Invia ordine bracket (TP e SL)
+        api.submit_order(
+            symbol=symbol,
+            qty=qty,
+            side=side,
+            type="market",
+            time_in_force="gtc",
+            order_class="bracket",
+            take_profit={"limit_price": tp},
+            stop_loss={"stop_price": sl}
+        )
+
+        return f"{action.upper()} su {symbol} con TP {tp} e SL {sl} inviato con quantità {qty}", 200
+
+    except Exception as e:
+        return f"Errore: {str(e)}", 500
