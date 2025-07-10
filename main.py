@@ -22,14 +22,23 @@ both_directions = ["NDX", "NAS1OO", "SPY", "XLE", "UVXY", "CEMB", "ITA", "CSSPX"
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    data = request.json
+    data = request.get_json(force=True, silent=True)
     if not data:
         return "Nessun dato ricevuto", 400
 
     action = data.get("action")
-    symbol = data.get("symbol", "").replace("BINANCE:", "").replace(":", "")  # Es: BINANCE:BTCUSDT → BTCUSDT
-    tp = float(data.get("take_profit"))
-    sl = float(data.get("stop_loss"))
+    symbol = data.get("symbol", "").replace("BINANCE:", "").replace(":", "")
+    tp = data.get("take_profit")
+    sl = data.get("stop_loss")
+
+    if not all([action, symbol, tp, sl]):
+        return "Dati incompleti. Richiesti: action, symbol, take_profit, stop_loss", 400
+
+    try:
+        tp = float(tp)
+        sl = float(sl)
+    except ValueError:
+        return "Valori take_profit o stop_loss non validi", 400
 
     if symbol in only_long_symbols and action == "short":
         return jsonify({"error": f"{symbol} è solo LONG"}), 403
@@ -38,22 +47,18 @@ def webhook():
     if symbol not in (only_long_symbols + only_short_symbols + both_directions):
         return jsonify({"error": f"{symbol} non è nella lista dei simboli permessi"}), 403
 
+    if action not in ["long", "short"]:
+        return f"Azione non riconosciuta: {action}", 400
+
     try:
-        # Calcolo quantità da tradare (3% del buying power)
         account = api.get_account()
         buying_power = float(account.buying_power)
         amount_to_trade = buying_power * 0.03
         market_price = float(api.get_latest_trade(symbol).price)
         qty = round(amount_to_trade / market_price, 4)
 
-        if action == "long":
-            side = "buy"
-        elif action == "short":
-            side = "sell"
-        else:
-            return f"Azione non riconosciuta: {action}", 400
+        side = "buy" if action == "long" else "sell"
 
-        # Invia ordine bracket (TP e SL)
         api.submit_order(
             symbol=symbol,
             qty=qty,
