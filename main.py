@@ -15,7 +15,7 @@ BASE_URL = "https://paper-api.alpaca.markets"
 # Inizializza Alpaca API
 api = tradeapi.REST(ALPACA_API_KEY, ALPACA_SECRET_KEY, BASE_URL, api_version="v2")
 
-# Liste simboli
+# Liste simboli consentiti (fuori dal try!)
 only_long_symbols = ["NDQM", "QQQ", "VOO", "AAPL", "WWRL", "ISP", "VDE", "NVDA"]
 only_short_symbols = ["VWCE"]
 both_directions = ["NDX", "NAS1OO", "SPY", "XLE", "UVXY", "CEMB", "ITA", "CSSPX", "ENI", "TSLA"]
@@ -31,7 +31,6 @@ def webhook():
     tp = float(data.get("take_profit"))
     sl = float(data.get("stop_loss"))
 
-    # Controlli di simbolo e direzione
     if symbol in only_long_symbols and action == "short":
         return jsonify({"error": f"{symbol} è solo LONG"}), 403
     if symbol in only_short_symbols and action == "long":
