@@ -41,19 +41,19 @@ def webhook():
         else:
             return f"Azione non riconosciuta: {action}", 400
 
-        # Invia ordine bracket (TP e SL)
-        
+        # Liste simboli
         only_long_symbols = ["NDQM", "QQQ", "VOO", "AAPL", "WWRL", "ISP", "VDE", "NVDA"]
-only_short_symbols = ["VWCE"]
-both_directions = ["NDX", "NAS1OO", "SPY", "XLE", "UVXY", "CEMB", "ITA", "CSSPX", "ENI", "TSLA"]
+        only_short_symbols = ["VWCE"]
+        both_directions = ["NDX", "NAS1OO", "SPY", "XLE", "UVXY", "CEMB", "ITA", "CSSPX", "ENI", "TSLA"]
 
-if symbol in only_long_symbols and action == "short":
-    return jsonify({"error": f"{symbol} è solo LONG"}), 403
-if symbol in only_short_symbols and action == "long":
-    return jsonify({"error": f"{symbol} è solo SHORT"}), 403
-if symbol not in (only_long_symbols + only_short_symbols + both_directions):
-    return jsonify({"error": f"{symbol} non è nella lista dei simboli permessi"}), 403
-    
+        if symbol in only_long_symbols and action == "short":
+            return jsonify({"error": f"{symbol} è solo LONG"}), 403
+        if symbol in only_short_symbols and action == "long":
+            return jsonify({"error": f"{symbol} è solo SHORT"}), 403
+        if symbol not in (only_long_symbols + only_short_symbols + both_directions):
+            return jsonify({"error": f"{symbol} non è nella lista dei simboli permessi"}), 403
+
+        # Invia ordine bracket (TP e SL)
         api.submit_order(
             symbol=symbol,
             qty=qty,
